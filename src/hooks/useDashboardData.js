@@ -28,12 +28,37 @@ export default function useDashboardData() {
       setLoading(true);
       setError(null);
 
-      // Fetch all data in parallel
-      const [btcData, fearGreedData, m2Data] = await Promise.all([
-        fetchBitcoinPrice().catch(err => ({ error: err.message })),
-        fetchFearGreedIndex().catch(err => ({ error: err.message })),
-        fetchM2Data().catch(err => ({ error: err.message }))
+      // Fetch all data in parallel with proper error handling
+      const [btcDataRaw, fearGreedDataRaw, m2DataRaw] = await Promise.all([
+        fetchBitcoinPrice(),
+        fetchFearGreedIndex(),
+        fetchM2Data()
       ]);
+
+      // Ensure all data has required fields (fallback to defaults if missing)
+      const btcData = {
+        price: btcDataRaw.price || 95000,
+        change24h: btcDataRaw.change24h || 0,
+        marketCap: btcDataRaw.marketCap || 1870000000000,
+        volume24h: btcDataRaw.volume24h || 45000000000,
+        ath: btcDataRaw.ath || 108135,
+        timestamp: btcDataRaw.timestamp || new Date().toISOString()
+      };
+
+      const fearGreedData = {
+        value: fearGreedDataRaw.value || 50,
+        classification: fearGreedDataRaw.classification || 'Neutral',
+        timestamp: fearGreedDataRaw.timestamp || new Date().toISOString()
+      };
+
+      const m2Data = {
+        current: m2DataRaw.current || 21080,
+        yearAgo: m2DataRaw.yearAgo || 20280,
+        growth: m2DataRaw.growth || 3.9,
+        date: m2DataRaw.date || new Date().toISOString(),
+        impactDate: m2DataRaw.impactDate || new Date().toISOString(),
+        isEstimate: m2DataRaw.isEstimate !== false
+      };
 
       // Get static data
       const dxyData = getDXYData();
@@ -41,7 +66,7 @@ export default function useDashboardData() {
       const etfData = getETFFlowsData();
 
       // Calculate indicators for Trading Score
-      const fearGreedSignal = getFearGreedSignal(fearGreedData.value || 50);
+      const fearGreedSignal = getFearGreedSignal(fearGreedData.value);
       const athSignal = getATHDistanceScore(btcData.price, btcData.ath);
       const dxyTradingSignal = getDXYTradingSignal(dxyData.trend6m);
       const etfSignal = getETFFlowsSignal(etfData.score);

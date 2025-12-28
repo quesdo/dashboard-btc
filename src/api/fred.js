@@ -15,24 +15,38 @@ const M2_SERIES_ID = 'M2SL'; // M2 Money Stock (seasonally adjusted)
 export async function fetchM2Data() {
   const apiKey = import.meta.env.VITE_FRED_API_KEY;
 
+  // Données de fallback actualisées (Décembre 2024)
+  const fallbackData = {
+    current: 21080, // M2 estimé en milliards USD (Déc 2024)
+    yearAgo: 20280,
+    growth: 3.9, // Croissance YoY estimée
+    date: '2024-11-01', // Dernière date estimée
+    impactDate: calculateImpactDate(new Date('2024-11-01'), 84),
+    isEstimate: true
+  };
+
   if (!apiKey) {
-    console.warn('FRED API key not found. Using fallback estimation.');
-    // Return fallback data
-    return {
-      current: 21000, // Estimation in billions
-      yearAgo: 20100,
-      growth: 4.3, // Estimated YoY growth
-      date: new Date().toISOString(),
-      impactDate: calculateImpactDate(new Date(), 84),
-      isEstimate: true
-    };
+    console.warn('⚠️ FRED API key not configured. Using fallback M2 data.');
+    return fallbackData;
   }
 
   try {
-    // Get most recent observation
+    // Get most recent observation avec timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+
     const response = await fetch(
-      `${FRED_BASE_URL}/series/observations?series_id=${M2_SERIES_ID}&api_key=${apiKey}&file_type=json&sort_order=desc&limit=13`
+      `${FRED_BASE_URL}/series/observations?series_id=${M2_SERIES_ID}&api_key=${apiKey}&file_type=json&sort_order=desc&limit=13`,
+      {
+        signal: controller.signal,
+        mode: 'cors',
+        headers: {
+          'Accept': 'application/json'
+        }
+      }
     );
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       throw new Error(`FRED API error: ${response.status}`);
@@ -40,6 +54,10 @@ export async function fetchM2Data() {
 
     const data = await response.json();
     const observations = data.observations;
+
+    if (!observations || observations.length < 13) {
+      throw new Error('Insufficient M2 data from FRED');
+    }
 
     // Most recent value
     const current = parseFloat(observations[0].value);
@@ -51,6 +69,8 @@ export async function fetchM2Data() {
     // Calculate YoY growth percentage
     const growth = ((current - yearAgo) / yearAgo) * 100;
 
+    console.log('✅ M2 data fetched successfully from FRED');
+
     return {
       current,
       yearAgo,
@@ -60,17 +80,15 @@ export async function fetchM2Data() {
       isEstimate: false
     };
   } catch (error) {
-    console.error('Error fetching M2 data:', error);
-    // Return fallback on error
-    return {
-      current: 21000,
-      yearAgo: 20100,
-      growth: 4.3,
-      date: new Date().toISOString(),
-      impactDate: calculateImpactDate(new Date(), 84),
-      isEstimate: true,
-      error: error.message
-    };
+    if (error.name === 'AbortError') {
+      console.warn('⏱️ FRED API timeout. Using fallback M2 data.');
+    } else if (error.message.includes('CORS')) {
+      console.warn('🚫 CORS error with FRED API. Using fallback M2 data.');
+    } else {
+      console.warn('⚠️ FRED API error:', error.message, '. Using fallback M2 data.');
+    }
+
+    return fallbackData;
   }
 }
 
