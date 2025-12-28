@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import useDashboardData from './hooks/useDashboardData';
+import useSignalNotifications from './hooks/useSignalNotifications';
 import Header from './components/Header';
 import BitcoinPriceCard from './components/BitcoinPriceCard';
 import ModeSelector from './components/ModeSelector';
 import TradingSection from './components/TradingSection';
 import MacroSection from './components/MacroSection';
+import TradingSignals from './components/TradingSignals';
 import GlobalSynthesis from './components/GlobalSynthesis';
 import Footer from './components/Footer';
 
@@ -20,6 +22,9 @@ function App() {
     setAutoRefresh,
     refresh
   } = useDashboardData();
+
+  // Enable email notifications for trading signals
+  useSignalNotifications(data);
 
   const handleModeChange = (newMode) => {
     setMode(newMode);
@@ -84,6 +89,9 @@ function App() {
 
             {/* Mode Selector */}
             <ModeSelector mode={mode} onModeChange={handleModeChange} />
+
+            {/* Trading Signals - Always Visible */}
+            <TradingSignals data={data} />
 
             {/* Trading Section */}
             {(mode === 'trading' || mode === 'both') && (
